@@ -1,11 +1,11 @@
 import numpy as np
 
-def nd_cartesian(*arrays):
+def nd_cartesian(*arrays, repeat=1):
     """Generate a Cartesian product of ndarrays.
 
     The order of the returned values is the same as `itertools.product`.
     """
-    return np.stack(np.meshgrid(*arrays, indexing='ij'), -1).reshape(-1, len(arrays))
+    return np.stack(np.meshgrid(*arrays * repeat, indexing='ij'), -1).reshape(-1, len(arrays))
 
 def trytuple(array):
     """Try to return `tuple(array)`; if not possible, return `array`.
