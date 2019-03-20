@@ -10,23 +10,31 @@ Cellua aims to resolve this problem by providing a Lua- and Python-extensible ce
 
 1. Python is easy. I already know it. Everyone knows it, or can learn it in a week!
 2. [Numpy](https://www.numpy.org) is blazingly fast and easy-to-use. I take every opportunity I can to use it.
-3. Wide range of 3D rendering opportunities, from high-level libraries to OpenGL bindings. If rendering performance becomes an issue in Cellua, I can just switch to a lower-level rendering library.
+3. Wide range of 3D rendering opportunities, from high-level premade engines to low-level OpenGL bindings. If rendering performance becomes an issue in Cellua, I can just switch to a lower-level rendering library.
 
 ## Why Lua? Why not a custom ruletable format?
 
 1. Lua is easy. I already know it. Everyone knows it, or can learn it in a day!
 2. [Lupa](https://github.com/scoder/lupa) uses LuaJIT2, which is _fast_. Much faster than Python, at least.
 3. I can [sandbox it](http://lua-users.org/wiki/SandBoxes).
-4. Ruletable formats are limiting, annoying to parse, and annoying to write.
-5. People write ruletable generators for Golly. Why write a ruletable generator when you can just have your Lua transition function take extra parameters?
+4. Custom ruletable formats are limiting, annoying to parse, and annoying to write.
+5. People write ruletable generators for Golly. Why write a ruletable generator when you can just have your Lua transition function take extra parameters, or write a Lua library for certain types of ruletables?
 
 ## Installation
 
-¯\\\_(ツ)_/¯
+In the future, I plan to distribute binaries of stable versions using [PyInstaller](https://www.pyinstaller.org/). Once Cellua is ready, you'll find those on the [releases page](https://github.com/HactarCE/Cellua/releases).
 
 ## Usage
 
-¯\\\_(ツ)_/¯
+There's nothing to use right now.
+
+## Development
+
+1. Install Python 3.7 or later.
+2. Download the repository: `git clone https://github.com/HactarCE/Cellua.git && cd Cellua`
+3. Install the package using whatever variant of Pip works best for you: `pip install --user '.[dev]'`.
+
+Use `pytest` to run all tests.
 
 ## Features
 
@@ -116,6 +124,12 @@ Most of these are not yet implemented. Not everything on this list will be imple
     - [ ] < 256 (2^8) states
     - [ ] < 65536 (2^16) states (?)
     - [ ] any Lua data structure (?)
+- [ ] Arbitrary dimension count
+    - [ ] 1D
+    - [ ] 2D
+    - [ ] 3D
+    - [ ] 4D+ (?)
+    - [ ] Time axis expressed as spatial dimension (?)
 - [ ] Lua transition function
     - [ ] Neighborhoods
         - [ ] Arbitrary range (within ±16, probably)
@@ -154,6 +168,7 @@ Most of these are not yet implemented. Not everything on this list will be imple
     - [ ] Do not simulate cells with no nonzero neighbors
         - [ ] Verify that transition obeys this rule (?)
     - [ ] Result caching (?)
+        - [ ] HashLife (?)
 
 ### Lua API
 
@@ -173,4 +188,3 @@ These are things that Cellua will probably never support. Lua extensions may try
 
 - "`B0`" rules (where a cell with no live neighbors becomes live)
 - Infinite grids with nonzero default state
-- 4D automata or higher
