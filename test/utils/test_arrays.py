@@ -4,9 +4,7 @@ import hypothesis.strategies as st
 import itertools
 import numpy as np
 
-# from utils.testing import dimensions_strategy
-
-from ..arrays import nd_cartesian
+from utils.arrays import nd_cartesian
 
 @given(
     arrays=st.lists(np_st.arrays(np_st.integer_dtypes(), np_st.array_shapes(1, 1, max_side=4)), min_size=1, max_size=4)

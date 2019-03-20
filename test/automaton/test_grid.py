@@ -1,39 +1,16 @@
 from hypothesis import given
 import hypothesis.strategies as st
-import hypothesis.extra.numpy as np_st
-import math
 import numpy as np
 
-from utils.testing import dimensions_strategy
+from .custom_strategies import (
+    byte_strategy,
+    cell_coords_strategy,
+    cell_offset_strategy,
+    dimensions_strategy,
+    neighborhood_size_strategy,
+)
 
-from ..grid import Grid
-
-
-byte_strategy = lambda: st.integers(-128, 127)
-
-def np_int64_arrays(shape, *args, **kwargs):
-    """Returns a strategy for generating integer ndarrays with a given shape.
-
-    All extra arguments are given to st.integers().
-    """
-    return np_st.arrays(
-        np.int64,
-        st.just(shape),
-        st.integers(*args, **kwargs),
-    )
-
-# -50 to 50 is plenty of range for cell coordinates
-def cell_coords_strategy(dimen, max_val=50):
-    return np_int64_arrays(dimen, -max_val, max_val)
-
-def cell_offset_strategy(dimen, max_val=4):
-    return np_int64_arrays(dimen, -max_val, max_val)
-
-def neighborhood_size_strategy(dimen, max_cell_count=1000000):
-    # 1 million cells = ~10 Mb.
-    max_radius = int(max_cell_count ** (1 / dimen) / 2)
-    # `.map(np.sort)` ensures that each pair has the lower number first.
-    return np_int64_arrays((dimen, 2), -max_radius, max_radius).map(np.sort)
+from automaton.grid import Grid
 
 grid_strategy = lambda dimen: st.builds(Grid, st.just(dimen))
 
