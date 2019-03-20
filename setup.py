@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from setuptools import setup
+from setuptools import find_packages, setup
 
 
 NAME = "Cellua"
@@ -29,6 +29,7 @@ setup(
             'hypothesis>=4.12',
         ],
     },
+    packages=find_packages(),
     package_data={
     },
     include_package_data=True,
