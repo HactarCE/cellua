@@ -104,6 +104,7 @@ class Grid:
 
         `coords_within_chunk` is modulo `chunk_shape`.
         """
+        global_coords = np.array(global_coords)
         return global_coords // self.chunk_shape, global_coords % self.chunk_shape
 
     def has_chunk(self, chunk_coords=None):
@@ -173,7 +174,7 @@ class Grid:
         chunk_coords, coords_within_chunk = self.get_coords_pair(global_coords)
         return self.get_chunk(chunk_coords)[tuple(coords_within_chunk)]
 
-    def _get_chunk_neighborhood(self, neighborhood):
+    def get_chunk_neighborhood(self, neighborhood):
         """Get the chunk neighborhood given a cell neighborhood.
 
         Return the neighborhood, on the chunk scale, that is guaranteed to
@@ -201,11 +202,11 @@ class Grid:
         `neighborhood` is on the cell scale; see `get_cell_napkin()`.
 
         The size of the return value can be predicted from
-        `_get_chunk_neighborhood()`, but for external callers that shouldn't be
+        `get_chunk_neighborhood()`, but for external callers that shouldn't be
         necessary. Just pass the result of this function to `get_cell_napkin()`.
         """
         d = self.dimensions
-        chunk_neighborhood = self._get_chunk_neighborhood(neighborhood)
+        chunk_neighborhood = self.get_chunk_neighborhood(neighborhood)
         chunk_offsets = chunk_neighborhood.get_offset_grid()
         # Using the last axis (the d-sized one), get the chunk for each
         # coordinate bunch.
@@ -237,7 +238,7 @@ class Grid:
         cell's `local_coords`.
         """
         chunk_coords, local_coords = self.get_coords_pair(global_coords)
-        chunk_neighborhood = self._get_chunk_neighborhood(neighborhood)
+        chunk_neighborhood = self.get_chunk_neighborhood(neighborhood)
         if chunk_napkin is None:
             chunk_napkin = self.get_chunk_napkin(chunk_coords, neighborhood)
         # Find the coordinates of the given cell within `chunk_napkin`.

@@ -80,6 +80,19 @@ def test_grid_del_chunk_if_empty(dimensioned_args, value):
 @given(
     dimensioned_args=dimensions_strategy().flatmap(lambda d: st.tuples(
         grid_strategy(d),
+        neighborhood_strategy(d),
+    ))
+)
+def test_inverse_chunk_neighborhood(dimensioned_args):
+    grid, neighborhood = dimensioned_args
+    chunk_neighborhood_of_inverse = grid.get_chunk_neighborhood(neighborhood.get_inverse())
+    inverse_of_chunk_neighborhood = grid.get_chunk_neighborhood(neighborhood).get_inverse()
+    assert chunk_neighborhood_of_inverse == inverse_of_chunk_neighborhood
+
+
+@given(
+    dimensioned_args=dimensions_strategy().flatmap(lambda d: st.tuples(
+        grid_strategy(d),
         cell_coords_strategy(d),
         neighborhood_strategy(d),
         st.lists(st.tuples(cell_offset_strategy(d), byte_strategy())),

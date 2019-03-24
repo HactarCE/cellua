@@ -96,8 +96,19 @@ class Neighborhood:
     def __str__(self):
         return 'x'.join(map(str, self.shape)) + ' neighborhood'
 
+    def __eq__(self, other):
+        return isinstance(other, Neighborhood) and (self.extents == other.extents).all()
+
     def copy(self):
         return Neighborhood(self.extents.copy())
+
+    def get_inverse(self):
+        """Return a Neighborhood that is inverted (mirrored) along each axis.
+
+        This can be used to figure out which cells have a neighborhood
+        containing a given cell.
+        """
+        return Neighborhood(-self.extents)
 
     def get_offset_grid(self):
         """Return a d-dimensionial ndarray of neighbor coordinate offsets.

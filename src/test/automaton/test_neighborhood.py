@@ -13,6 +13,8 @@ from .custom_strategies import (
 )
 def test_neighborhood(neighborhood):
     offsets = list(neighborhood)
+    # Test that the inverse of the inverse is the original
+    assert neighborhood.get_inverse().get_inverse() == neighborhood
     # Test that len(neighborhood) is accurate.
     assert len(neighborhood) == len(offsets)
     # Test that there are no duplicate coordinates.
