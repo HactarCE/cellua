@@ -50,13 +50,13 @@ class Grid:
     ```
     """
 
-    def __init__(self, dimensions, cell_dtype=np.byte):
+    def __init__(self, dimensions, cell_dtype=np.byte, _chunks=None):
         self.dimensions = dimensions
         self.cell_dtype = cell_dtype
         self.chunk_size = get_recommended_chunk_size(dimensions)
         self.chunk_shape = (self.chunk_size,) * self.dimensions
         self._empty_chunk_prototype = np.zeros(self.chunk_shape, self.cell_dtype)
-        self._chunks = {}
+        self._chunks = _chunks or {}
 
     def __iter__(self):
         """Iterate over all chunks.
@@ -64,6 +64,12 @@ class Grid:
         Each element of the iterator is a tuple of the form `(chunk_key, chunk)`.
         """
         return ((np.array(k), v) for k, v in self._chunks.items())
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self.dimensions!r}, cell_dtype={self.cell_dtype!r}, _chunks={self._chunks!r})'
+
+    def __str__(self):
+        return f'{self.dimensions}D grid with {len(self._chunks)} chunks'
 
     def empty_copy(self):
         """Return an empty copy of the current grid with all the same settings."""
