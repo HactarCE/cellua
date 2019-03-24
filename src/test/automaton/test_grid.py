@@ -7,12 +7,14 @@ from .custom_strategies import (
     cell_coords_strategy,
     cell_offset_strategy,
     dimensions_strategy,
-    neighborhood_size_strategy,
+    grid_strategy,
+    neighborhood_strategy,
 )
 
-from automaton.grid import Grid
 
-grid_strategy = lambda dimen: st.builds(Grid, st.just(dimen))
+def assert_grid_iter(grid):
+    for chunk_coords, chunk in grid:
+        assert chunk is grid.get_chunk(chunk_coords)
 
 
 @given(
@@ -26,6 +28,7 @@ def test_grid_set_get(dimensioned_args, value):
     grid, coords = dimensioned_args
     grid.set_cell(coords, value)
     assert grid.get_cell(coords) == value
+    assert_grid_iter(grid)
 
 
 @given(
@@ -37,7 +40,7 @@ def test_grid_set_get(dimensioned_args, value):
     value1=byte_strategy(),
     value2=byte_strategy(),
 )
-def test_grid_set_get_nearby(dimensioned_args, value1, value2):
+def test_grid_multi_set(dimensioned_args, value1, value2):
     grid, coords1, offset = dimensioned_args
     coords2 = coords1 + offset
     grid.set_cell(coords1, value1)
@@ -46,6 +49,7 @@ def test_grid_set_get_nearby(dimensioned_args, value1, value2):
     # If not any(offset), then the same cell was set again
     assert grid.get_cell(coords1) == (value1 if offset.any() else value2)
     assert grid.get_cell(coords2) == value2
+    assert_grid_iter(grid)
 
 
 @given(
@@ -59,29 +63,35 @@ def test_grid_del_chunk_if_empty(dimensioned_args, value):
     grid, coords = dimensioned_args[:2]
     grid.set_cell(coords, value)
     chunk_coords, _ = grid.get_coords_pair(coords)
-    assert(grid.has_chunk(chunk_coords))
+    value_is_zero = not value
+    value_is_nonzero = not value_is_zero
+    assert grid.has_chunk(chunk_coords)
+    assert grid.is_chunk_empty(chunk_coords) == value_is_zero
+    assert grid.is_empty()                   == value_is_zero
     grid.del_chunk_if_empty(chunk_coords)
-    assert(grid.has_chunk(chunk_coords) == (value != 0))
+    assert grid.has_chunk(chunk_coords)      == value_is_nonzero
+    assert grid.is_chunk_empty(chunk_coords) == value_is_zero
+    assert grid.is_empty()                   == value_is_zero
     grid.set_cell(coords, 0)
     grid.del_chunk_if_empty(chunk_coords)
-    assert(not grid.has_chunk(chunk_coords))
+    assert not grid.has_chunk(chunk_coords)
 
 
 @given(
     dimensioned_args=dimensions_strategy().flatmap(lambda d: st.tuples(
         grid_strategy(d),
         cell_coords_strategy(d),
-        neighborhood_size_strategy(d),
+        neighborhood_strategy(d),
         st.lists(st.tuples(cell_offset_strategy(d), byte_strategy())),
     )),
 )
 def test_napkin(dimensioned_args):
     grid, center_coords, neighborhood, neighbor_cells = dimensioned_args
-    radius = np.absolute(neighborhood).max()
+    radius = neighborhood.max_radius
     square_napkin = np.zeros(shape=(radius * 2 + 1,) * grid.dimensions, dtype=np.byte)
     for offset, value in neighbor_cells:
         grid.set_cell(center_coords + offset, value)
         if all(abs(offset) <= radius):
             square_napkin[tuple(offset + radius)] = value
-    napkin_slice = tuple(slice(lower, upper + 1) for lower, upper in neighborhood + radius)
+    napkin_slice = tuple(slice(lower, upper + 1) for lower, upper in neighborhood.extents + radius)
     assert grid.get_cell_napkin(center_coords, neighborhood).tolist() == square_napkin[napkin_slice].tolist()
