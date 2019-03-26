@@ -15,14 +15,14 @@ Cellua aims to resolve this problem by providing a Lua- and Python-extensible ce
 ## Why Lua? Why not a custom ruletable format?
 
 1. Lua is easy. I already know it. Everyone knows it, or can learn it in a day!
-2. [Lupa](https://github.com/scoder/lupa) uses LuaJIT2, which is _fast_. Much faster than Python, at least.
-3. I can [sandbox it](http://lua-users.org/wiki/SandBoxes).
+2. I can [sandbox it](http://lua-users.org/wiki/SandBoxes).
+3. [Lupa](https://github.com/scoder/lupa) uses LuaJIT2, which is _fast_. Much faster than Python, at least.
 4. Custom ruletable formats are limiting, annoying to parse, and annoying to write.
-5. People write ruletable generators for Golly. Why write a ruletable generator when you can just have your Lua transition function take extra parameters, or write a Lua library for certain types of ruletables?
+5. People write ruletable generators for Golly. If your rule definition language is Turing-complete, you can use the same system for rule definition and rule generation.
 
 ## Installation
 
-In the future, I plan to distribute binaries of stable versions using [PyInstaller](https://www.pyinstaller.org/). Once Cellua is ready, you'll find those on the [releases page](https://github.com/HactarCE/Cellua/releases).
+In the future, I plan to distribute binaries of stable versions using [PyInstaller](https://www.pyinstaller.org/). Once Cellua is ready, you'll find those on the [releases page](https://github.com/HactarCE/Cellua/releases). For now, see **Development** to build the program from source.
 
 ## Usage
 
@@ -30,13 +30,18 @@ There's nothing to use right now.
 
 ## Development
 
-1. Install Python 3.7 or later.
-2. Download the repository: `git clone https://github.com/HactarCE/Cellua.git && cd Cellua`
-3. Install the package using whatever variant of Pip works best for you: `pip install --user '.[dev]'`.
+1. Install [Python 3.7](https://www.python.org/downloads/) or later.
+2. Install [LuaJIT](http://luajit.org/install.html). (I use LuaJIT 2.0.5, but any 2.x should probably be fine.)
+3. Download the repository: `git clone https://github.com/HactarCE/Cellua.git && cd Cellua`
+4. Install the package using whatever variant of Pip works best for you: `pip install --user '.[dev]'`.
 
 Use `pytest` to run all tests.
 
-## Features
+## Implemented Features
+
+## Immediate To-Do
+
+## Planned Features
 
 Most of these are not yet implemented. Not everything on this list will be implemented; `(?)` denotes those that are difficult, questionable, or at least low-priority, but anything on this list may be changed or removed.
 
@@ -119,20 +124,22 @@ Most of these are not yet implemented. Not everything on this list will be imple
 - [ ] Basic controls (see **Editor**)
 - [ ] Recenter pattern
 - [ ] Save/load
-- [ ] Arbitrary state count
-    - [ ] 2-state
-    - [ ] < 256 (2^8) states
-    - [ ] < 65536 (2^16) states (?)
-    - [ ] any Lua data structure (?)
-- [ ] Arbitrary dimension count
-    - [ ] 1D
-    - [ ] 2D
-    - [ ] 3D
-    - [ ] 4D+ (?)
+- [ ] Arbitrary state count / cell size
+    - [ ] 1 bit (2 states)
+    - [ ] 8 bits (<=256 states)
+    - [ ] 16 bits (<=65536 states) (?)
+    - [ ] 32 bits (<=2^32 states) (?)
+    - [x] 64 bits (<=2^64 states)
+    - [ ] Lua table (?)
+- [x] Arbitrary dimension count
+    - [x] 1D
+    - [x] 2D
+    - [x] 3D
+    - [x] 4D+ (?)
     - [ ] Time axis expressed as spatial dimension (?)
 - [ ] Lua transition function
     - [ ] Neighborhoods
-        - [ ] Arbitrary range (within ±16, probably)
+        - [x] Arbitrary range
         - [ ] Arbitrary bitmask
     - [ ] Symmetries (?)
         - [ ] Rotation
@@ -149,15 +156,16 @@ Most of these are not yet implemented. Not everything on this list will be imple
     - [ ] Error handling
     - [ ] Absolute time/space position dependency (?)
         - [ ] e.g. `B0` emulation (temporal parity)
-        - [ ] e.g. Margolus neighborhood (spatiotemporal parity for X/Y/Z)
+        - [ ] e.g. Margolus neighborhood (spatiotemporal parity for X/Y)
     - [ ] Special support for time-reversable automata (?)
 - [ ] Bounded grids
     - [ ] For each axis:
-        - [ ] Infinite
+        - [x] Infinite
         - [ ] Finite
         - [ ] Loop
             - [ ] Reflect perpendicular axis #1
             - [ ] Reflect perpendicular axis #2
+            - [ ] ???
     - [ ] Presets: infinite space, finite space, hypertorus
 - [ ] Alternate tessellations (?)
     - [ ] Sphere packing

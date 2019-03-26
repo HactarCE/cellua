@@ -22,6 +22,7 @@ setup(
     python_requires='>=3.7',
     url='https://github.com/{}/{}'.format(AUTHOR, NAME),
     install_requires=[
+        'lupa>=1.8',
         'numpy>=1.16',
     ],
     extras_require={
