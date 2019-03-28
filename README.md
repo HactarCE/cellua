@@ -2,6 +2,8 @@
 
 **Cellua is currently in the very early stages of development. Anything and everything is subject to change.**
 
+[![Discord](https://img.shields.io/badge/chat-on%20Discord-7289da.svg?logo=discord&logoWidth=17&logoColor=white)](https://discord.gg/vdJwHQF)
+
 There are a vast number of cellular automaton simulators already, but very few support rules with an arbitrary number of states and transitions. [Golly](http://golly.sourceforge.net/Help/index.html) is the most popular, and is _very_ fast with Conway's Game of Life and similar automata, but has measley 3D and large-neighborhood support. Additionally, all rules must be defined in Golly's own ruletable format; while this works well for some rules, it is incredibily tedious and inefficient for others. Due to the lack of other modern, configurable cellular automaton simulators, CA communities tend to focus their efforts on creating and exploring only those automata that Golly is capable of simulating.
 
 Cellua aims to resolve this problem by providing a Lua- and Python-extensible cellular automaton simulator, supporting both 2D and 3D rules specified by Lua transition functions.
