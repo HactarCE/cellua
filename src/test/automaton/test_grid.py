@@ -106,5 +106,8 @@ def test_napkin(dimensioned_args):
         grid.set_cell(center_coords + offset, value)
         if all(abs(offset) <= radius):
             square_napkin[tuple(offset + radius)] = value
-    napkin_slice = tuple(slice(lower, upper + 1) for lower, upper in neighborhood.extents + radius)
+    napkin_slice = tuple(map(slice,
+        neighborhood.lower_bounds + radius,
+        neighborhood.upper_bounds + radius + 1
+    ))
     assert grid.get_cell_napkin(center_coords, neighborhood).tolist() == square_napkin[napkin_slice].tolist()

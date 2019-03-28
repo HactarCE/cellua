@@ -52,6 +52,5 @@ def neighborhood_strategy(dimen, max_cell_count=10000):
     Neighborhood will contain more than ten thousand cells.
     """
     max_radius = int(max_cell_count ** (1 / dimen) / 2)
-    # `.map(np.sort)` ensures that each pair has the lower number first.
-    extents_strategy = np_int64_arrays((dimen, 2), -max_radius, max_radius).map(np.sort)
-    return st.builds(Neighborhood, extents_strategy)
+    bounds_strategy = np_int64_arrays((2, dimen), -max_radius, max_radius)
+    return st.builds(Neighborhood, bounds_strategy)

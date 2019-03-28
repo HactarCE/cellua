@@ -194,7 +194,7 @@ class Grid:
         #      X     --> (X - 1) // chunk_size + 1
         chunk_lower_bounds = neighborhood.lower_bounds // self.chunk_shape
         chunk_upper_bounds = (neighborhood.upper_bounds - 1) // self.chunk_shape + 1
-        return Neighborhood(np.stack((chunk_lower_bounds, chunk_upper_bounds), axis=-1))
+        return Neighborhood([chunk_lower_bounds, chunk_upper_bounds])
 
     def get_chunk_napkin(self, chunk_coords, neighborhood):
         """Get the d-dimensional napkin of a chunk.
@@ -211,9 +211,9 @@ class Grid:
         # Using the last axis (the d-sized one), get the chunk for each
         # coordinate bunch.
         chunks = np.apply_along_axis(self.get_chunk, -1, chunk_coords + chunk_offsets)
-        # Now the array is chunk_neighborhood.shape*chunk_shape. The outermost d
-        # dimensions correspond to chunk layout, while the innermost d
-        # dimensions correspond to cell layout within each chunk. We want to
+        # `chunks.shape` is now `chunk_neighborhood.shape + chunk_shape`. The
+        # outermost d dimensions correspond to chunk layout, while the innermost
+        # d dimensions correspond to cell layout within each chunk. We want to
         # merge each nth dimension with the (n+d)th, since they're really the
         # same spatially. We could call np.concatenate() repeatedly, but instead
         # we'll swap dimensions such that each nth and (n+d)th dimension are

@@ -18,14 +18,14 @@ class Neighborhood:
 
     Public read-only properties:
     - `dimensions` -- integer number of dimensions
-    - `extents` -- integer ndarray of shape (d, 2); each number is an offset
-      (usually in [negative, positive] pairs) from the center cell; for example
-      [[-3, 2], [0, 0], [-1, 1]] describes a 6x1x3 3D neighborhood
+    - `bounds` -- integer ndarray of shape (2, d); each row is a set of
+      coordinate offsets from the center cell; for example [[-3, 0, -1], [2, 0,
+      1] describes a 6x1x3 3D neighborhood
     - `lower_bounds` -- 1D integer ndarray of size d representing the lower
-      bounds of the neighborhood along each axis; equivalent to `extents[:,0]`
+      bounds of the neighborhood along each axis; equivalent to `bounds[0]`
     - `upper_bounds` -- 1D integer ndarray of size d representing the upper
-      bounds of the neighborhood along each axis; equivalent to `extents[:,1]`
-    - `max_radius` -- integer absolute maximum value of `extents`; i.e. the
+      bounds of the neighborhood along each axis; equivalent to `bounds[1]`
+    - `max_radius` -- integer absolute maximum value of `bounds`; i.e. the
       Moore radius of the neighborhood
 
     A Neighborhood object can be used as an iterator to get the relative
@@ -57,18 +57,18 @@ class Neighborhood:
     6
     """
 
-    def __init__(self, extents):
-        extents = np.array(extents)
-        if extents.ndim != 2 or extents.shape[1] != 2:
-            return ValueError(f"Invalid neighborhood array shape: {extents}")
-        extents.sort()
-        self.dimensions = extents.shape[0]
-        self.extents = extents
-        self.lower_bounds, self.upper_bounds = self.extents.T
+    def __init__(self, bounds):
+        bounds = np.array(bounds)
+        if bounds.ndim != 2 or bounds.shape[0] != 2:
+            return ValueError(f"Invalid neighborhood array shape: {bounds}")
+        bounds.sort(0)
+        self.dimensions = bounds.shape[1]
+        self.bounds = bounds
+        self.lower_bounds, self.upper_bounds = self.bounds
         shape_ndarray = self.upper_bounds - self.lower_bounds + 1
         self.shape = tuple(shape_ndarray)
         self.size = shape_ndarray.prod()
-        self.max_radius = np.absolute(extents).max()
+        self.max_radius = np.absolute(bounds).max()
 
     def __contains__(self, offset):
         """Determine whether some offset is within the neighborhood."""
@@ -83,7 +83,7 @@ class Neighborhood:
         offset from the "center" cell of the neighborhood.
         """
         # For each axis, get the range along that axis.
-        axis_range_iters = (range(lower, upper + 1) for lower, upper in self.extents)
+        axis_range_iters = map(range, self.lower_bounds, self.upper_bounds + 1)
         # Take a Cartesian product of those ranges to get the offsets.
         return map(np.array, itertools.product(*axis_range_iters))
 
@@ -91,16 +91,16 @@ class Neighborhood:
         return self.size
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({self.extents!r})'
+        return f'{self.__class__.__name__}({self.bounds!r})'
 
     def __str__(self):
         return 'x'.join(map(str, self.shape)) + ' neighborhood'
 
     def __eq__(self, other):
-        return isinstance(other, Neighborhood) and (self.extents == other.extents).all()
+        return isinstance(other, Neighborhood) and (self.bounds == other.bounds).all()
 
     def copy(self):
-        return Neighborhood(self.extents.copy())
+        return Neighborhood(self.bounds.copy())
 
     def get_inverse(self):
         """Return a Neighborhood that is inverted (mirrored) along each axis.
@@ -108,14 +108,14 @@ class Neighborhood:
         This can be used to figure out which cells have a neighborhood
         containing a given cell.
         """
-        return Neighborhood(-self.extents)
+        return Neighborhood(-self.bounds)
 
     def get_offset_grid(self):
         """Return a d-dimensionial ndarray of neighbor coordinate offsets.
 
-        The shape of the resulting array is (neighborhood.shape)*d. This result,
-        reshaped to (-1, d), has the same contents as the iterator.
+        The shape of the resulting array is `neighborhood.shape + (d,)`. This
+        result, reshaped to (-1, d), has the same contents as the iterator.
         """
         # See Neighborhood.__iter__() for an explanation.
-        axis_ranges = (np.arange(lower, upper + 1) for lower, upper in self.extents)
+        axis_ranges = map(np.arange, self.lower_bounds, self.upper_bounds + 1)
         return utils.nd_cartesian_grid(*axis_ranges)
