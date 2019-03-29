@@ -99,16 +99,20 @@ class Neighborhood:
     def __eq__(self, other):
         return isinstance(other, Neighborhood) and (self.bounds == other.bounds).all()
 
-    def copy(self):
-        return Neighborhood(self.bounds.copy())
+    def invert(self, axes=None):
+        """Return a Neighborhood that is inverted (mirrored) along each axis in
+        `axes`.
 
-    def get_inverse(self):
-        """Return a Neighborhood that is inverted (mirrored) along each axis.
-
-        This can be used to figure out which cells have a neighborhood
-        containing a given cell.
+        If `axes` is `None` or omitted, invert all axes. This can be used to
+        figure out which cells have a neighborhood containing a given cell.
         """
-        return Neighborhood(-self.bounds)
+        if axes:
+            new_bounds = self.bounds.copy()
+            for axis in axes:
+                new_bounds[:, axis] *= -1
+            return Neighborhood(new_bounds)
+        else:
+            return Neighborhood(-self.bounds)
 
     def get_offset_grid(self):
         """Return a d-dimensionial ndarray of neighbor coordinate offsets.

@@ -1,5 +1,6 @@
 from hypothesis import given
 import hypothesis.strategies as st
+import hypothesis.extra.numpy as np_st
 import numpy as np
 
 from .custom_strategies import (
@@ -13,8 +14,6 @@ from .custom_strategies import (
 )
 def test_neighborhood(neighborhood):
     offsets = list(neighborhood)
-    # Test that the inverse of the inverse is the original
-    assert neighborhood.get_inverse().get_inverse() == neighborhood
     # Test that len(neighborhood) is accurate.
     assert len(neighborhood) == len(offsets)
     # Test that there are no duplicate coordinates.
@@ -32,3 +31,17 @@ def test_neighborhood(neighborhood):
     if len(offsets) > 1:
         offsets[-1][-1] += 1  # Test above upper bound on last axis.
         assert offsets[-1] not in neighborhood
+
+@given(
+    dimensioned_args=dimensions_strategy().flatmap(lambda d: st.tuples(
+        neighborhood_strategy(d),
+        np_st.arrays(np.bool, st.just(d), st.booleans()).map(np.nonzero),
+    ))
+)
+def test_neighborhood_invert(dimensioned_args):
+    neighborhood, axes = dimensioned_args
+    # Test that the inverse of the inverse is the original
+    assert neighborhood.invert().invert() == neighborhood
+    assert neighborhood.invert(axes).invert(axes) == neighborhood
+    if not axes:
+        assert neighborhood.invert(axes) == neighborhood.invert()

@@ -85,8 +85,8 @@ def test_grid_del_chunk_if_empty(dimensioned_args, value):
 )
 def test_inverse_chunk_neighborhood(dimensioned_args):
     grid, neighborhood = dimensioned_args
-    chunk_neighborhood_of_inverse = grid.get_chunk_neighborhood(neighborhood.get_inverse())
-    inverse_of_chunk_neighborhood = grid.get_chunk_neighborhood(neighborhood).get_inverse()
+    chunk_neighborhood_of_inverse = grid.get_chunk_neighborhood(neighborhood.invert())
+    inverse_of_chunk_neighborhood = grid.get_chunk_neighborhood(neighborhood).invert()
     assert chunk_neighborhood_of_inverse == inverse_of_chunk_neighborhood
 
 
