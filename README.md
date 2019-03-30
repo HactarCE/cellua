@@ -39,9 +39,9 @@ There's nothing to use right now.
 
 Use `pytest` to run all tests.
 
-## Implemented Features
+## Known Issues
 
-## Immediate To-Do
+- Lua transition function can manipulate global state using closures.
 
 ## Planned Features
 
