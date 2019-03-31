@@ -1,6 +1,8 @@
 from lupa import LuaRuntime
 import lupa
 
+from utils import lua as lua_utils
+
 
 # http://lua-users.org/wiki/SandBoxes
 # Some variables that are listed on the Lua wiki as safe are still forbidden for
@@ -38,7 +40,7 @@ class LuaSandbox:
     """A wrapper for LuaRuntime to use when running untrusted code.
 
     This has some Cellua-specific features, like scanning for unauthorized use
-    of globals or closures [closures NYI].
+    of globals/closures [closures NYI] and inclusion of Cellua utility modules.
     """
 
     def __init__(self, *,
@@ -87,8 +89,10 @@ class LuaSandbox:
             new_globals.update(custom_globals)
         new_globals = self.table_from(new_globals)
         # Override global table access if necessary.
+        self._sandboxer_code = ''
         if not allow_global_state:
-            new_globals = self.make_table_readonly_recursive(
+            new_globals = lua_utils.make_table_readonly_recursive(
+                self,
                 new_globals,
                 "Cannot set value '%s' on %s; global variables are forbidden"
             )
@@ -103,39 +107,9 @@ class LuaSandbox:
     def __getattr__(self, name):
         return getattr(self._lua, name)
 
-    def make_table_readonly(self, table, error_format="Cannot set value '%s' on %s"):
-        """Wrap a Lua table with a metatable that prevents writes."""
-        return self._lua.eval('''
-            function(tab, error_format)
-                local new_table = {}
-                setmetatable(new_table, {
-                    __index=tab,
-                    __newindex=function(t, k, v)
-                        error(string.format(error_format, k, new_table))
-                    end,
-                })
-                return new_table
-            end
-        ''')(table, error_format)
-
-    def make_table_readonly_recursive(self, table, *args, **kwargs):
-        """Run LuaSandbox.make_table_readonly() recursively, so that any tables
-        that are members of this one are also read-only.
-        """
-        new_table = self.table()
-        for key, value in table.items():
-            if self._lua.eval('type')(value) == 'table':
-                new_table[key] = self.make_table_readonly_recursive(value, *args, **kwargs)
-            else:
-                new_table[key] = value
-        return self.make_table_readonly(new_table, *args, **kwargs)
-
     def _sandbox(self, lua_code):
         # TODO: Handle self._allow_global_state here by scanning AST for
         # closures. Raise an exception if one is found.
-        print(self.globals()._VERSION)
-        print(self._sandboxer_code)
-        print(repr(self._sandboxer_code + lua_code))
         return self._sandboxer_code + lua_code
 
     def compile(self, lua_code):
