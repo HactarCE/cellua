@@ -32,12 +32,35 @@ There's nothing to use right now.
 
 ## Development
 
-1. Install [Python 3.7](https://www.python.org/downloads/) or later.
-2. Install [LuaJIT](http://luajit.org/install.html). (I use LuaJIT 2.0.5, but any 2.x should probably be fine.)
-3. Download the repository: `git clone https://github.com/HactarCE/Cellua.git && cd Cellua`
-4. Install the package using whatever variant of Pip works best for you: `pip install --user '.[dev]'`.
+These instructions assume that you are using Linux, but the process is similar on other operating systems.
 
-Use `pytest` to run all tests.
+### Install with normal Lua
+
+1. Install [Python 3.7](https://www.python.org/downloads/) or later.
+2. Download the repository: `git clone https://github.com/HactarCE/Cellua.git && cd Cellua`.
+3. Set up a virtualenv: `python -m venv .env.lua53 && source .env.lua53/bin/activate`
+3. Install Cellua: `pip install '.[dev]'`.
+
+### Install with LuaJIT
+
+To improve performance (or for testing purposes), build Lupa using LuaJIT:
+
+1. Install [Python 3.7](https://www.python.org/downloads/) or later.
+2. Install [LuaJIT](http://luajit.org/install.html). (Pre-built binaries can be found [here](https://github.com/luapower/luajit/releases).)
+3. Download the repository: `git clone https://github.com/HactarCE/Cellua.git && cd Cellua`.
+4. Set up a virtualenv: `python -m venv .env.luajit205 && source .env.luajit205/bin/activate`
+5. Install [Cython](https://cython.readthedocs.io/en/latest/src/quickstart/install.html), which is required in order to build Lupa with LuaJIT: `pip install Cython`.
+6. Download and install [Lupa](https://github.com/scoder/lupa): `git clone https://github.com/scoder/lupa.git && cd lupa && pip install .`.
+7. Install Cellua: `pip install '.[dev]'`.
+
+### Testing
+
+Run `pytest` to run all tests.
+
+### Building
+
+1. Install Cellua: `pip install '.[dev, build]'`.
+2. Run the build script: `./build.sh`.
 
 ## Known Issues
 

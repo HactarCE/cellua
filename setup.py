@@ -4,7 +4,7 @@
 from setuptools import find_packages, setup
 
 
-NAME = "Cellua"
+NAME = "cellua"
 AUTHOR = "HactarCE"
 
 try:
@@ -28,6 +28,9 @@ setup(
     extras_require={
         'dev': [
             'hypothesis>=4.12',
+        ],
+        'build': [
+            'pyinstaller',
         ],
     },
     packages=find_packages(),
