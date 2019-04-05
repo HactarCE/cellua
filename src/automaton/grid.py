@@ -1,8 +1,7 @@
 import itertools
 import numpy as np
 
-from .neighborhood import Neighborhood
-import utils
+from .region import Region
 
 
 def get_recommended_chunk_size(dimensions):
@@ -177,7 +176,7 @@ class Grid:
     def get_chunk_neighborhood(self, neighborhood):
         """Get the chunk neighborhood given a cell neighborhood.
 
-        Return the neighborhood, on the chunk scale, that is guaranteed to
+        Return a chunk-scale Region of the neighborhood that is guaranteed to
         contain the neighborhood of every cell in the origin chunk. The shape of
         the return value is the same as the input value `neighborhood`. This
         determines the size/shape of the array returned by get_chunk_napkin().
@@ -194,12 +193,12 @@ class Grid:
         #      X     --> (X - 1) // chunk_size + 1
         chunk_lower_bounds = neighborhood.lower_bounds // self.chunk_shape
         chunk_upper_bounds = (neighborhood.upper_bounds - 1) // self.chunk_shape + 1
-        return Neighborhood([chunk_lower_bounds, chunk_upper_bounds])
+        return Region([chunk_lower_bounds, chunk_upper_bounds])
 
     def get_chunk_napkin(self, chunk_coords, neighborhood):
-        """Get the d-dimensional napkin of a chunk.
+        """Get a Pattern of the d-dimensional napkin of a chunk.
 
-        `neighborhood` is on the cell scale; see `get_cell_napkin()`.
+        `neighborhood` is a cell-scale Region; see `get_cell_napkin()`.
 
         The size of the return value can be predicted from
         `get_chunk_neighborhood()`, but for external callers that shouldn't be

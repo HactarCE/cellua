@@ -3,7 +3,7 @@ import hypothesis.extra.numpy as np_st
 import numpy as np
 
 from automaton.grid import Grid
-from automaton.neighborhood import Neighborhood
+from automaton.region import Region
 
 
 byte_strategy = lambda: st.integers(-128, 127)
@@ -46,11 +46,11 @@ def grid_strategy(dimen):
     return st.builds(Grid, st.just(dimen))
 
 def neighborhood_strategy(dimen, max_cell_count=10000):
-    """Return a strategy for Neighborhoods of a given dimensionality.
+    """Return a strategy for neighborhoods of a given dimensionality.
 
     By default, the maximum radius of the neighborhood is set so that no
-    Neighborhood will contain more than ten thousand cells.
+    Region will contain more than ten thousand cells.
     """
     max_radius = int(max_cell_count ** (1 / dimen) / 2)
     bounds_strategy = np_int64_arrays((2, dimen), -max_radius, max_radius)
-    return st.builds(Neighborhood, bounds_strategy)
+    return st.builds(Region, bounds_strategy)
