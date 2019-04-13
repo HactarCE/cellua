@@ -27,22 +27,23 @@ class Grid:
     For now, all grids are infinite.
 
     Conventions:
-    - `global_coords` -- integer ndarray of dimension 1 and size d; identifies a
+    - global_coords -- integer ndarray of dimension 1 and size d; identifies a
       cell's position in the whole grid (on the cell scale)
-    - `local_coords` -- integer ndarray of dimension 1 and size d; identifies a
+    - local_coords -- integer ndarray of dimension 1 and size d; identifies a
       cell's position within a chunk
-    - `chunk_coords` -- integer ndarray of dimension 1 and size d; identifies a
+    - chunk_coords -- integer ndarray of dimension 1 and size d; identifies a
       chunk's position in the whole grid (on the chunk scale)
-    - `chunk` -- ndarray of dimension d and size `chunk_size`; contains the
-      cells of a chunk
+    - chunk -- ndarray of dimension d and size `chunk_size`; contains the cells
+      of a chunk
 
     Public read-only properties:
-    - `dimensions` -- integer number of dimensions
-    - `cell_dtype` -- Numpy dtype to use for each cell
-    - `chunk_size` -- integer edge length of each chunk
-    - `chunk_shape` -- tuple describing the shape of the ndarray for each chunk
+    - dimensions -- integer number of dimensions
+    - cell_dtype -- Numpy dtype to use for each cell
+    - chunk_size -- integer edge length of each chunk
+    - chunk_shape -- tuple describing the shape of the ndarray for each chunk
 
     A Grid object can be used as an iterator to get all of its chunks:
+
     ```py
     for chunk_coords, chunk in grid:
         assert(chunk is grid.get_chunk(chunk_coords))
@@ -206,7 +207,7 @@ class Grid:
         """
         d = self.dimensions
         chunk_neighborhood = self.get_chunk_neighborhood(neighborhood)
-        chunk_offsets = chunk_neighborhood.get_offset_grid()
+        chunk_offsets = chunk_neighborhood.get_coordinates_grid()
         # Using the last axis (the d-sized one), get the chunk for each
         # coordinate bunch.
         chunks = np.apply_along_axis(self.get_chunk, -1, chunk_coords + chunk_offsets)
@@ -221,8 +222,6 @@ class Grid:
         # Now that we've transposed the axes, we can reshape it, merging pairs
         # of adjacent dimensions.
         chunks = chunks.reshape(tuple(np.array(chunk_neighborhood.shape) * self.chunk_shape))
-        # TODO try setting the shape directly instead of using .reshape() to see
-        # if copying happens.
         return chunks
 
     def get_cell_napkin(self, global_coords, neighborhood, chunk_napkin=None):

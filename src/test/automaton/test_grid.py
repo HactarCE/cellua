@@ -8,7 +8,7 @@ from .custom_strategies import (
     cell_offset_strategy,
     dimensions_strategy,
     grid_strategy,
-    neighborhood_strategy,
+    region_strategy,
 )
 
 
@@ -80,7 +80,7 @@ def test_grid_del_chunk_if_empty(dimensioned_args, value):
 @given(
     dimensioned_args=dimensions_strategy().flatmap(lambda d: st.tuples(
         grid_strategy(d),
-        neighborhood_strategy(d),
+        region_strategy(d),
     ))
 )
 def test_inverse_chunk_neighborhood(dimensioned_args):
@@ -94,7 +94,7 @@ def test_inverse_chunk_neighborhood(dimensioned_args):
     dimensioned_args=dimensions_strategy().flatmap(lambda d: st.tuples(
         grid_strategy(d),
         cell_coords_strategy(d),
-        neighborhood_strategy(d),
+        region_strategy(d),
         st.lists(st.tuples(cell_offset_strategy(d), byte_strategy())),
     )),
 )
