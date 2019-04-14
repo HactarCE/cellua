@@ -34,6 +34,16 @@ There's nothing to use right now.
 
 These instructions assume that you are using Linux, but the process is similar on other operating systems.
 
+There are three options for installing Cellua:
+
+* [Lua 5.2+](#install-with-normal-lua) — Easy to install, has all features, runs somewhat slow
+* [LuaJIT](#install-with-luajit) — Slightly more complicated to install, missing a few features, runs fast
+* [LuaJIT with compat for Lua 5.2](#install-with-52-compatible-luajit) — Tricky to install, has all features, runs fast
+
+There are still instructions for all of these processes, and if you run into issues compiling on *nix I'm happy to help. If you're using Windows, I'd recommend sticking to the first option since that's simplest.
+
+When I make binary releases, I'll use the third option (LuaJIT with 5.2+ compatibility).
+
 ### Install with normal Lua
 
 1. Install [Python 3.7](https://www.python.org/downloads/) or later.
@@ -43,15 +53,31 @@ These instructions assume that you are using Linux, but the process is similar o
 
 ### Install with LuaJIT
 
+**Warning: Using LuaJIT not compiled with `-DLUAJIT_ENABLE_LUA52COMPAT` will prevent access to certain features (e.g. `#pattern` and `pairs(pattern)`). Because of this, using LuaJIT without `-DLUAJIT_ENABLE_LUA52COMPAT` is _not_ officially supported.** See [**Install with 5.2-compatible LuaJIT**](#install-with-52-compatible-luajit).
+
 To improve performance (or for testing purposes), build Lupa using LuaJIT:
 
 1. Install [Python 3.7](https://www.python.org/downloads/) or later.
-2. Install [LuaJIT](http://luajit.org/install.html). (Pre-built binaries can be found [here](https://github.com/luapower/luajit/releases).)
-3. Download the repository: `git clone https://github.com/HactarCE/Cellua.git && cd Cellua`.
-4. Set up a virtualenv: `python -m venv .env.luajit205 && source .env.luajit205/bin/activate`
-5. Install [Cython](https://cython.readthedocs.io/en/latest/src/quickstart/install.html), which is required in order to build Lupa with LuaJIT: `pip install Cython`.
-6. Download and install [Lupa](https://github.com/scoder/lupa): `git clone https://github.com/scoder/lupa.git && cd lupa && pip install .`.
-7. Install Cellua: `pip install '.[dev]'`.
+2. Download the repository: `git clone https://github.com/HactarCE/Cellua.git && cd cellua`.
+3. Set up a virtualenv: `python -m venv .env.luajit205 && source .env.luajit205/bin/activate`
+4. Install [Cython](https://cython.readthedocs.io/en/latest/src/quickstart/install.html), which is required in order to build Lupa with LuaJIT: `pip install Cython`.
+6. Download and install [Lupa](https://github.com/scoder/lupa) elsewhere: `cd .. && git clone https://github.com/scoder/lupa.git && cd lupa && pip install .`.
+7. Return to the original Cellua folder and install Cellua: `cd .. && pip install '.[dev]'`.
+
+### Install with 5.2-compatible LuaJIT
+
+While technically this doesn't give full Lua 5.2 compatibility, it's enough for now.
+
+1. Install [Python 3.7](https://www.python.org/downloads/) or later.
+2. Download the repository: `git clone https://github.com/HactarCE/Cellua.git && cd cellua`.
+3. Set up a virtualenv: `python -m venv .env.luajit205 && source .env.luajit205/bin/activate`
+2. Install [Cython](https://cython.readthedocs.io/en/latest/src/quickstart/install.html), which is required in order to build Lupa with LuaJIT: `pip install Cython`.
+3. Download the [Lupa](https://github.com/scoder/lupa) repository: `git clone https://github.com/scoder/lupa.git && cd lupa`.
+4. Download LuaJIT: `git clone https://github.com/LuaJIT/LuaJIT && cd LuaJIT`. (Do this inside of the `lupa` folder.)
+5. Compile LuaJIT with Lua 5.2 compatibility: `make clean && make XCFLAGS=-DLUAJIT_ENABLE_LUA52COMPAT CFLAGS=-fPIC`.
+6. Compile Lupa: `cd .. && make clean && make`.
+7. Install Lupa: `pip install .`
+8. Return to the original Cellua folder and install Cellua: `cd .. && pip install '.[dev]'`.
 
 ### Testing
 
