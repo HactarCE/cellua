@@ -194,7 +194,7 @@ class Grid:
         #      X     --> (X - 1) // chunk_size + 1
         chunk_lower_bounds = neighborhood.lower_bounds // self.chunk_shape
         chunk_upper_bounds = (neighborhood.upper_bounds - 1) // self.chunk_shape + 1
-        return Region([chunk_lower_bounds, chunk_upper_bounds])
+        return Region.span([chunk_lower_bounds, chunk_upper_bounds])
 
     def get_chunk_napkin(self, chunk_coords, neighborhood):
         """Get a Pattern of the d-dimensional napkin of a chunk.
@@ -207,7 +207,7 @@ class Grid:
         """
         d = self.dimensions
         chunk_neighborhood = self.get_chunk_neighborhood(neighborhood)
-        chunk_offsets = chunk_neighborhood.get_coordinates_grid()
+        chunk_offsets = chunk_neighborhood.position_grid
         # Using the last axis (the d-sized one), get the chunk for each
         # coordinate bunch.
         chunks = np.apply_along_axis(self.get_chunk, -1, chunk_coords + chunk_offsets)

@@ -1,34 +1,23 @@
+from abc import ABC, abstractmethod
 import numpy as np
 
-import utils
+import utils.arrays
+import utils.convert
 
 
-class Region:
-    """An immutable object describing an integer hyperrectangle.
+class Region(ABC):
+    """An immutable base class for any finite set of positions on a grid.
 
     Public read-only properties:
-    - empty -- bool; whether the region is empty; if this is True, then no other
-      public properties besides `dimensions`, `size`, `shape`, `has_mask`, and
-      `mask` are defined.
-    - dimensions -- integer number of dimensions
-    - bounds -- integer ndarray of shape (2, d); each row is a set of
-      coordinate offsets from the center cell; for example [[-3, 0, -1], [2, 0,
-      1] describes a 6x1x3 3D region
-    - lower_bounds -- 1D integer ndarray of size d representing the lower
-      bounds of the region along each axis; equivalent to `bounds[0]`
-    - upper_bounds -- 1D integer ndarray of size d representing the upper
-      bounds of the region along each axis; equivalent to `bounds[1]`
-    - max_radius -- integer absolute maximum value of `bounds`
-    - mask -- None or bool ndarray with same shape as region
-    - has_mask -- bool; whether `mask is not None`
-    - size -- integer; number of cells in region
-    - shape -- integer tuple; Numpy-style shape of region
+    - count -- integer; number of members
+    - dimensions -- integer; number of dimensions
+    - is_empty -- bool; whether count == 0
+    - shape -- integer tuple; Numpy-like shape of bounding box
 
-    A Region object can be used as an iterator to get the relative coordinates
-    (offsets) of each cell:
+    A region can be used as an iterator to get the coordinates of each cell:
 
     ```py
-    >>> for offset in Region([[-2, 0], [0, 1]]):
+    >>> for offset in Region.span([[-2, 0], [0, 1]]):
     ...     print(offset)
     [-2 0]
     [-2 1]
@@ -39,66 +28,79 @@ class Region:
     ```
 
     A region can be used with the `in` keyword to test whether it contains some
-    position or fully contains some other region.
+    position or fully contains some other region:
 
-    `len()` returns the number of cells in a region (same as `region.size`).
+    ```py
+    >>> some_coords in some_region
+    >>> inner_region in outer_region
+    ```
+
+    `len()` returns the number of cells in a region (same as `region.count`).
 
     Boolean operators can be used to find the intersection (`r1 & r2`), union
     (`r1 | r2`), and difference (`r1 ^ r2`) between two regions. To "subtract"
     one region from another, use `r1 & r2 ^ r1`. To check for intersection,
     prefer `Region.intersects()` over `&`.
 
-    Addition, subtraction, and negation all operate on each coordinate
-    separately. A region can be added or subtracted with a coordinate tuple;
-    e.g. `region + (2, -1)` will offset a region by +2 along X and -1 along Y.
+    Addition and subtraction all operate on each coordinate separately. A
+    coordinate tuple can be added to or subtracted from a region; e.g. `region +
+    (2, -1)` will offset a 2D region by +2 along X and -1 along Y.
+
+    Regions are equal iff they contain the same set of cells. Region equality
+    can be tested using `==`.
     """
 
-    def __init__(self, bounds, mask=None, *, minify=True):
-        """Create a Region object from bounds and an optional mask.
+    def span(bounds, mask=None):
+        """Instantiate a Region subclass from bounds and an optional mask.
+
+        Arguments:
+        - bounds -- one of the following:
+            - integer ndarray of shape (2, d); two opposite corners
+            - integer ndarray of shape (d,); single cell
+            - Region; same bounds as the given region
 
         Optional arguments:
-        - bounds -- ndarray of shape (2, d); a 2D array [corner1, corner2]
-          (inclusive) defining the bounds of the region.
-        - mask -- None or bool ndarray with same shape as region (defaults to
-          None)
+        - mask (default None) -- boolean ndarray with shape the same as Region
+          or None
 
-        Alternatively, `bounds` may be an integer number of dimensions, in which
-        case an empty region will be created.
-
-        Optional keyword arguments:
-        - minify -- bool (defaults to True); if True and a mask is present, the
-          region will be made as small as possible while still including all the
-          positions included in the mask.
-
-        If `mask` is all True, then it will be replaced with None.
-
-        If there are smaller bounds containing every True value of `mask`, then
-        the bounds will be shrunk accordingly.
+        If a single cell is supplied with no mask, a 1^d region will be
+        returned. If a single cell is supplied with a non-null mask, the single
+        cell will be used as the minimum bound and the region size will be
+        inferred from the mask.
         """
-        bounds = np.array(bounds)  # Copy `bounds` and ensure it's an ndarray.
-        if bounds.shape and (bounds.ndim != 2 or bounds.shape[0] != 2):
-            return ValueError(f"Invalid region array shape: {bounds}")
-        if not bounds.shape or (mask is not None and not mask.any()):
-            if bounds.shape:
-                self.dimensions = bounds.shape[1]
+        if isinstance(bounds, Region):
+            region = bounds
+            if hasattr(region, 'bounds'):
+                bounds = region.bounds
+            elif mask is None:
+                return region.box
             else:
-                self.dimensions = int(bounds)
-            self.empty = True
-            self.shape = (0,) * self.dimensions
-            self.size = 0
-            self.has_mask = False
-            self.mask = None
-            return
+                return TypeError(f"Cannot add mask to {region} of type {region.__class__.__name__}")
+        else:
+            # Copy `bounds` and ensure it's an ndarray.
+            bounds = np.array(bounds)
+            if (bounds.ndim == 2 and bounds.shape[0] == 1) or bounds.ndim == 1:
+                if mask is None:
+                    raise ValueError(f"Supplied single coordinate array {coords} for 'coords', but 'mask' is None")
+                elif mask.ndim == bounds.shape[-1]:
+                    lower_bounds = bounds.flatten()
+                    bounds = np.array([lower_bounds, lower_bounds + mask.shape - 1])
+                else:
+                    raise ValueError(f"Mask dimensionality {mask.ndim} does not match bounds dimensionality {bounds.shape[-1]}")
+            if bounds.ndim != 2 or bounds.shape[0] != 2:
+                raise ValueError(f"Invalid region array shape: {bounds}")
+        dimensions = bounds.shape[1]
+        if mask is not None and not mask.any():
+            return Region.empty(dimensions)
         bounds.sort(0)  # Ensure that `lower_bounds < upper_bounds`.
-        self.dimensions = bounds.shape[1]
-        if isinstance(mask, np.ndarray):
-            tmp_shape = tuple(bounds[1] - bounds[0] + 1)
-            if mask.shape != tmp_shape:
-                raise ValueError(f"Mask shape {mask.shape} does not match region shape {tmp_shape}")
-            if minify:
+        if mask is not None:
+            if isinstance(mask, np.ndarray):
+                region_shape = tuple(bounds[1] - bounds[0] + 1)
+                if mask.shape != region_shape:
+                    raise ValueError(f"Mask shape {mask.shape} does not match region shape {region_shape}")
                 # For each axis, try to make the region as small as possible
                 # while still including all the True values in the mask.
-                for axis in range(self.dimensions):
+                for axis in range(dimensions):
                     lower, upper = 0, -1
                     # Move the relevant axis to the zeroth position for
                     # convenience.
@@ -113,306 +115,534 @@ class Region:
                     mask = mask[lower:] if upper == -1 else mask[lower:upper + 1]
                     # Move the axis back to where it belongs.
                     mask = np.moveaxis(mask, 0, axis)
-                # If the mask is smaller, make a copy to save memory and make it
-                # contiguous.
-                if mask.shape != tmp_shape:
+                # If the mask is all True, don't bother storing it.
+                if not mask.all():
+                    # Copy the mask to guarantee immutability and potentially save
+                    # memory by making the array contiguous.
                     mask = mask.copy()
-            # If the mask is all True, don't bother storing it.
-            if mask.all():
-                mask = None
-        elif mask is not None:
-            raise TypeError(f"Mask must be an ndarray or None; {type(mask)} found instead")
-        self.empty = False
-        self.bounds = bounds
-        self.lower_bounds, self.upper_bounds = self.bounds
-        shape_ndarray = self.upper_bounds - self.lower_bounds + 1
-        self.mask = mask
-        self.has_mask = mask is not None
-        self.shape = tuple(shape_ndarray)
-        self.size = np.count_nonzero(mask) if self.has_mask else shape_ndarray.prod()
-        self.max_radius = np.absolute(self.bounds).max()
+                    return MaskedRegion(bounds=bounds, mask=mask)
+            else:
+                raise TypeError(f"Mask must be an ndarray or None; {mask} found instead")
+        return RectRegion(bounds=bounds)
+
+    def empty(arg):
+        """Instantiate an empty region.
+
+        Arguments:
+        - arg -- one of the following:
+            - integer; number of dimensions
+            - Region; number of dimensions will be inferred from Region
+        """
+        if isinstance(arg, Region):
+            return EmptyRegion(d=arg.dimensions)
+        else:
+            return EmptyRegion(d=utils.convert.to_dimen(arg))
+
+    @property
+    @abstractmethod
+    def dimensions(self):
+        ...
+
+    @property
+    def is_empty(self):
+        return not self.count
+
+    @property
+    @abstractmethod
+    def shape(self):
+        ...
+
+    @property
+    @abstractmethod
+    def count(self):
+        ...
+
+    def __len__(self):
+        return self.count
 
     def __contains__(self, other):
-        """Return whether some offset or region is within `self`."""
+        """Return whether some offset or region is within this region."""
         if isinstance(other, Region):
-            if other.empty:
-                return True
-            elif self.empty:
-                return False
-            # Check whether the bounding rectangles fit.
-            if not ((other.upper_bounds <= self.upper_bounds).all() and
-                    (self.lower_bounds <= other.lower_bounds).all()):
-                return False
-            # If the bounding rectangles fit and this region has no mask, then
-            # the other region will definitely fit inside.
-            if not self.has_mask:
-                return True
-            # Subtract `self` from `other` and check whether any cells remain.
-            return (self & other ^ other).empty
+            return self._contains_region(other)
         else:
-            if self.empty:
-                return False
-            coords = utils.arrays.convert_to_coords(other, self.dimensions)
-            above_lower = (self.lower_bounds <= coords).all()
-            below_upper = (coords <= self.upper_bounds).all()
-            if not (above_lower and below_upper):
-                return False
-            return (not self.has_mask) or self.mask[tuple(coords - self.lower_bounds)]
+            return self._contains_position(utils.convert.to_coords(other, self.dimensions))
 
+    @abstractmethod
+    def _contains_region(self, other):
+        """Return whether some region is within this region."""
+
+    @abstractmethod
+    def _contains_position(self, other):
+        """Return whether some position is within this region."""
+
+    @abstractmethod
     def __iter__(self):
-        """Iterate over cell coordinate offsets.
+        """Iterate over cell positions.
 
         Each element of the iterator is a 1D ndarray of coordinates.
         """
-        if self.empty:
-            return iter(())
-        positions = np.ndindex(*self.shape)
-        positions = (np.array(i) + self.lower_bounds for i in positions)
-        if self.has_mask:
-            positions = filter(self.__contains__, positions)
-        return positions
 
-    def __len__(self):
-        """Return the number of cells in the region."""
-        return self.size
-
-    def __repr__(self):
-        s = f'{self.__class__.__name__}('
-        if self.empty:
-            s += f'{self.dimensions!r}'
-        else:
-            s += f'{self.bounds!r}'
-            if self.has_mask:
-                s += f', {self.mask!r}'
-        s += ')'
-        return s
-
-    def __str__(self):
-        if self.empty:
-            s = f'empty {self.dimensions}D region'
-        else:
-            s = 'x'.join(map(str, self.shape))
-            if self.dimensions == 1:
-                s += '-length'
-            s += f' region from {tuple(self.lower_bounds)} to {tuple(self.upper_bounds)}'
-            if self.has_mask:
-                s += f' with {np.count_nonzero(self.mask)}-element mask'
-        return f'[{s}]'
-
+    @abstractmethod
     def __eq__(self, other):
-        if not isinstance(other, Region):
-            return False
-        if self.empty or other.empty:
-            return self.empty == other.empty
-        return (np.all(self.bounds == other.bounds)
-                and np.all(self.mask == other.mask))
+        ...
+
+    @abstractmethod
+    def _op(self, op, other):
+        """Apply a set operation between two regions.
+
+        Arguments:
+        - self -- Region
+        - op -- string; one of ('&', '|', '^')
+        - other -- Region
+        """
+
+    def _boolean_op(self, op, other):
+        """Internal function used for boolean operator magic methods."""
+        if isinstance(other, Region):
+            if self.dimensions == other.dimensions:
+                result = self._op(op, other)
+                if result is NotImplemented:
+                    result = other._op(op, self)
+                return result
+            else:
+                raise ValueError(f"Dimension mismatch between {self} and {other}")
+        else:
+            return NotImplemented
 
     def __and__(self, other):
         """Return the intersection of two regions."""
         return self._boolean_op('&', other)
 
     def __xor__(self, other):
-        """Return the difference between two regions."""
+        """Return the symmetric difference between two regions."""
         return self._boolean_op('^', other)
 
     def __or__(self, other):
         """Return the union of two regions."""
         return self._boolean_op('|', other)
 
+    @abstractmethod
+    def _offset(self, offset):
+        """Offset a region by a coordinate tuple."""
+
     def __add__(self, other):
         """Offset a region by a coordinate tuple."""
-        return self._offset(other, +1)
+        return self._offset(utils.convert.to_coords(other, self.dimensions))
 
     def __sub__(self, other):
         """Offset a region by a negated coordinate tuple."""
-        return self._offset(other, -1)
+        return self._offset(-utils.convert.to_coords(other, self.dimensions))
 
-    def __neg__(self):
-        """Invert a region along all axes. (See `Region.invert()`.)"""
-        return self.invert()
-
-    def _boolean_op(self, op, other):
-        """Internal function used for boolean operator magic methods."""
-        if isinstance(other, Region):
-            return self.op(op, other)
-        else:
-            return NotImplemented
-
-    def _offset(self, offset, multiplier):
-        """Internal function used for addition and subtraction magic methods."""
-        try:
-            offset = np.array(offset, dtype=np.int64)
-        except ValueError:
-            return NotImplemented
-        offset *= multiplier
-        if not offset.shape == (self.dimensions,):
-            if len(offset.shape) > 1:
-                return ValueError(f"Offset {offset} has too many dimensions")
-            else:
-                return ValueError(f"Dimension mismatch between {self} and {offset}")
-        if self.empty:
-            return self
-        return Region(self.bounds + offset, self.mask)
-
-    def op(self, op, other):
-        """Apply a boolean operator between the cells sets of two regions.
-
-        Arguments:
-        - self -- Region
-        - op -- string; one of ('&', '|', '^', '&~')
-        - other -- Region
-        """
-        if self.dimensions != other.dimensions:
-            raise ValueError(f"Dimension mismatch between {self} and {other}")
-        if not (self.empty or other.empty):
-            if op == '&':
-                # Optimization: When computing intersection beytween two regions
-                # with non-intersecting bounding boxes, the result is empty.
-                # (Remove masks because `Region.intersects()` depends on this
-                # function for handling masked regions.)
-                if not self.remask().intersects(other.remask()):
-                    return self.empty_copy()
-                # Optimization: When computing intersection, only include the
-                # intersection between the regions (obviously).
-                lower_bounds = np.maximum(self.lower_bounds, other.lower_bounds)
-                upper_bounds = np.minimum(self.upper_bounds, other.upper_bounds)
-                # Optimization: When computing intersection between two regions
-                # without masks, the final region does not need a mask.
-                if not (self.has_mask or other.has_mask):
-                    return Region([lower_bounds, upper_bounds])
-            else:
-                # For anything besides intersectioni, get the lower and upper
-                # bounds of the union of both regions. (Compute the mask later.)
-                lower_bounds = np.minimum(self.lower_bounds, other.lower_bounds)
-                upper_bounds = np.maximum(self.upper_bounds, other.upper_bounds)
-            r = Region([lower_bounds, upper_bounds])
-            new_mask = np.zeros(r.shape, dtype=bool)
-            new_mask[r.slices(self)] = self.mask[self.slices(r)] if self.has_mask else True
-            sliced_other_mask = other.mask[other.slices(r)] if other.has_mask else True
-        if op == '&':
-            if self.empty:
-                return self
-            if other.empty:
-                return other
-            new_mask[r.slices(other)] &= sliced_other_mask
-        elif op == '|':
-            if self.empty:
-                return other
-            if other.empty:
-                return self
-            new_mask[r.slices(other)] |= sliced_other_mask
-        elif op == '^':
-            if self.empty:
-                return other
-            if other.empty:
-                return self
-            new_mask[r.slices(other)] ^= sliced_other_mask
-        elif op == '&~':
-            if self.empty or other.empty:
-                return self
-            new_mask[r.slices(other)] &= ~sliced_other_mask
-        return r.remask(new_mask)
-
+    @abstractmethod
     def intersects(self, other):
         """Return whether `self` and `other` intersect at all."""
-        if self.empty or other.empty:
-            return False
-        # Check whether the bounding rectangles intersect.
-        if not ((self.lower_bounds <= other.upper_bounds) &
-                (other.lower_bounds <= self.upper_bounds)).all():
-            return False
-        # If the bounding rectangles overlap and neither region has a mask, then
-        # they must intersect.
-        if not (self.has_mask or other.has_mask):
-            return True
-        return not (self & other).empty
 
-    def slices(self, other):
-        """Return an iterator of the slices that can be used to get the part of
-        `self`'s mask which is inside of the bounding rectangle of `other`.
-
-        Raises ValueError if `self` and `other` do not intersect.
-        """
-        if self.empty or other.empty:
-            return False
-        if not self.remask().intersects(other.remask()):
-            raise ValueError(f"Regions {self} and {other} do not intersect; cannot compute intersecting slices")
-        shared_lower, shared_upper = np.clip(self.bounds, *other.bounds) - self.lower_bounds
-        return tuple(map(slice, shared_lower, shared_upper + 1))
-
-    def empty_copy(self):
-        """Return an empty region with the same dimension count as this one."""
-        return self.__class__(self.dimensions)
-
-    def minify(self):
-        """Return a minified copy of this region; reduce the bounding box to the
-        minimum possible according to the mask.
-
-        This has no effect on unmasked regions or regions created without
-        minify=False.
-        """
-        if self.empty:
-            return self
-        return self.__class__(self.bounds, self.mask)
-
-    def remask(self, new_mask=None):
-        """Return a copy of this region with a different mask."""
-        if self.empty:
-            return self
-        return self.__class__(self.bounds, new_mask)
-
+    @abstractmethod
     def invert(self, axes=None):
         """Invert (mirror) this region along each axis in the tuple `axes`.
 
         If `axes` is `None` or omitted, invert all axes. This can be used to
         figure out which cells have a region containing a given cell.
         """
-        if self.empty:
+
+    @property
+    @abstractmethod
+    def box(self):
+        """A region representing the bounding box of this region."""
+
+    @property
+    @abstractmethod
+    def positions(self):
+        """A 2D ndarray listing of cell coordinates.
+
+        The shape of the resulting ndarray is `(region.count, d)`. This result
+        has the same contents as the iterator.
+        """
+
+    @property
+    @abstractmethod
+    def position_grid(self):
+        """Return a (d+1)-dimensionial ndarray of cell coordinates in the
+        bounding box of this region.
+
+        The shape of the resulting ndarray is `region.shape + (d,)`. If the
+        region is hyperrectangular then this result, reshaped to (-1, d), is the
+        same as `region.positions`.
+        """
+
+
+class EmptyRegion(Region):
+    """An immutable empty set of positions on a grid.
+
+    Do not instantiate this class directly; use Region.empty() instead.
+    """
+
+    def __init__(self, *args, d):
+        self._dimensions = d
+
+    @property
+    def dimensions(self):
+        """Implements Region.dimensions."""
+        return self._dimensions
+
+    is_empty = True  # Overrides Region.is_empty.
+
+    @property
+    def shape(self):
+        """Implements Region.shape."""
+        return (0,) * self.dimensions
+
+    count = 0  # Overrides Region.count.
+
+    def _contains_region(self, other):
+        """Implements Region._contains_region()."""
+        return other.is_empty
+
+    def _contains_position(self, other):
+        """Implements Region._contains_position()."""
+        return False
+
+    def __iter__(self):
+        """Implements Region.__iter__()."""
+        return iter(())
+
+    def __repr__(self):
+        return f'Region.empty({self.dimensions})'
+
+    def __str__(self):
+        return f'[empty {self.dimensions}D region]'
+
+    def __eq__(self, other):
+        """Implements Region.__eq__()."""
+        return isinstance(other, Region) and other.is_empty
+
+    def _op(self, op, other):
+        """Implements Region._op()."""
+        if op == '&':
             return self
-        axes = axes or None  # Turn empty tuple into None.
-        if self.has_mask:
-            new_mask = np.flip(self.mask, axes)
+        if op in ('|', '^'):
+            return other
+
+    def _offset(self, offset):
+        """Implements Region._offset()."""
+        return self
+
+    def intersects(self, other):
+        """Implements Region.intersects()."""
+        return False
+
+    def invert(self, axes=None):
+        """Implements Region.invert()."""
+        return self
+
+    @property
+    def box(self):
+        """Implements Region.box"""
+        return self
+
+    @property
+    def positions(self):
+        """Implements Region.positions."""
+        return np.empty(shape=(0, self.dimensions), dtype=np.int64)
+
+    @property
+    def position_grid(self):
+        """Implements Region.position_grid."""
+        return np.empty(shape=self.shape + (self.dimensions,), dtype=np.int64)
+
+
+class RectRegion(Region):
+    """An immutable non-empty hyperrectangle of positions on a grid.
+
+    Do not instantiate this class directly; use Region.span() instead.
+
+    Public read-only properties:
+    - bounds -- integer ndarray of shape (2, d); each row is a set of coordinate
+      offsets from the center cell; for example [[-3, 0, -1], [2, 0, 1]
+      describes a 6x1x3 3D region
+    - lower_bounds -- 1D integer ndarray of size d representing the lower bounds
+      of the region along each axis; equivalent to `bounds[0]`
+    - upper_bounds -- 1D integer ndarray of size d representing the upper bounds
+      of the region along each axis; equivalent to `bounds[1]`
+    - max_radius -- integer absolute maximum value of `bounds`
+    - has_mask -- bool; whether the regions is masked (only True for subclasses)
+    ... and all of Region's read-only properties.
+    """
+
+    def __init__(self, *args, bounds):
+        self.lower_bounds, self.upper_bounds = self.bounds = bounds
+
+    @property
+    def dimensions(self):
+        """Implements Region.dimensions."""
+        return self.lower_bounds.size
+
+    is_empty = False  # Overrides Region.is_empty.
+
+    has_mask = False
+
+    @property
+    def mask(self):
+        return np.ones(self.shape, dtype=np.bool)
+
+    @property
+    def _shape_tuple(self):
+        return self.upper_bounds - self.lower_bounds + 1
+
+    @property
+    def shape(self):
+        """Implements Region.shape."""
+        return tuple(self._shape_tuple)
+
+    @property
+    def count(self):
+        """Implements Region.count."""
+        return np.prod(self._shape_tuple)
+
+    def _contains_region(self, other):
+        """Implements Region._contains_region()."""
+        if other.is_empty:
+            return True
+        if not isinstance(other, RectRegion):
+            return NotImplemented
+        # Check whether the bounding boxes fit.
+        if not ((other.upper_bounds <= self.upper_bounds).all() and
+                (self.lower_bounds <= other.lower_bounds).all()):
+            return False
+        # If the bounding boxes fit and this region has no mask, then the other
+        # region will definitely fit inside.
+        if not (self.has_mask or other.has_mask):
+            return True
+        # Subtract `self` from `other` and check whether any cells remain.
+        return (self & other ^ other).is_empty
+
+    def _contains_position(self, other):
+        """Implements Region._contains_position()."""
+        coords = utils.convert.to_coords(other, self.dimensions)
+        above_lower = (self.lower_bounds <= coords).all()
+        below_upper = (coords <= self.upper_bounds).all()
+        return above_lower and below_upper
+
+    def __iter__(self):
+        """Implements Region.__iter__()."""
+        offsets = np.ndindex(*self.shape)
+        return (np.array(i) + self.lower_bounds for i in offsets)
+
+    def __repr__(self):
+        if len(self) == 1:
+            b = self.lower_bounds
         else:
-            new_mask = None
+            b = self.bounds
+        return f'Region.span({b!r})'
+
+    def __str__(self):
+        if len(self) == 1:
+            s = f'single-cell region at {tuple(self.lower_bounds)}'
+        else:
+            s = 'x'.join(map(str, self.shape))
+            if self.dimensions == 1:
+                s = f'length-{s}'
+            s += f' region from {tuple(self.lower_bounds)} to {tuple(self.upper_bounds)}'
+        return f'[{s}]'
+
+    def __eq__(self, other):
+        """Overrides Region.__eq__()."""
+        if not isinstance(other, RectRegion):
+            return False
+        return ((self.bounds == other.bounds).all()
+                and not (self.has_mask or other.has_mask))
+
+    def _op(self, op, other):
+        """Overrides Region._op()."""
+        if self.dimensions != other.dimensions:
+            raise ValueError(f"Dimension mismatch between {self} and {other}")
+        if other.is_empty:
+            return other._op(op, self)
+        if op == '&':
+            # Optimization: When computing intersection beytween two regions
+            # with non-intersecting bounding boxes, the result is empty.
+            # (Remove masks because `Region.intersects()` depends on this
+            # function for handling masked regions.)
+            if not Region.span(self).intersects(Region.span(other)):
+                return Region.empty(self)
+            # Optimization: When computing intersection, only include the
+            # intersection between the regions (obviously).
+            lower_bounds = np.maximum(self.lower_bounds, other.lower_bounds)
+            upper_bounds = np.minimum(self.upper_bounds, other.upper_bounds)
+            # Optimization: When computing intersection between two regions
+            # without masks, the final region does not need a mask.
+            if not (self.has_mask or other.has_mask):
+                return Region.span([lower_bounds, upper_bounds])
+        else:
+            # For anything besides intersection, get the lower and upper
+            # bounds of the union of both regions. (Compute the mask later.)
+            lower_bounds = np.minimum(self.lower_bounds, other.lower_bounds)
+            upper_bounds = np.maximum(self.upper_bounds, other.upper_bounds)
+        r = Region.span([lower_bounds, upper_bounds])
+        new_mask = np.zeros(r.shape, dtype=bool)
+        new_mask[r.slices(self)] = self.mask[self.slices(r)] if self.has_mask else True
+        sliced_other_mask = other.mask[other.slices(r)] if other.has_mask else True
+        if op == '&':
+            new_mask[r.slices(other)] &= sliced_other_mask
+        elif op == '|':
+            new_mask[r.slices(other)] |= sliced_other_mask
+        elif op == '^':
+            new_mask[r.slices(other)] ^= sliced_other_mask
+        return Region.span(r, new_mask)
+
+    def _offset(self, offset):
+        """Implements Region._offset()."""
+        return Region.span(self.bounds + offset)
+
+    def intersects(self, other):
+        """Implements Region.intersects()."""
+        if other.is_empty:
+            return False
+        # Check whether the bounding boxes intersect.
+        if not ((self.lower_bounds <= other.upper_bounds) &
+                (other.lower_bounds <= self.upper_bounds)).all():
+            return False
+        # If the bounding boxes overlap and neither region has a mask, then they
+        # must intersect.
+        if not (self.has_mask or other.has_mask):
+            return True
+        return not (self & other).is_empty
+
+    def invert(self, axes=None):
+        """Implements Region.invert()."""
+        axes = axes or None  # Turn empty tuple into None.
         if axes:
             new_bounds = self.bounds.copy()
             for axis in axes:
                 new_bounds[:, axis] *= -1
         else:
             new_bounds = -self.bounds
-        return Region(new_bounds, new_mask)
+        return Region.span(new_bounds)
 
-    def get_mask(self):
-        """If `self.has_mask`, return `self.mask`; otherwise return an all-True
-        mask with the same size/shape as this region.
-        """
-        if (not self.empty) and self.has_mask:
-            return self.mask
-        else:
-            return np.ones(self.shape, dtype=bool)
+    @property
+    def box(self):
+        """Implements Region.box"""
+        return self
 
-    def get_coordinates_list(self):
-        """Return a 2D ndarray listing of cell coordinates.
+    @property
+    def positions(self):
+        """Implements Region.positions."""
+        return self.position_grid.reshape(-1, self.dimensions)
 
-        The shape of the resulting ndarray is `(region.size, d)`. This result
-        has the same contents as the iterator.
-        """
-        offsets = np.transpose(np.nonzero(self.get_mask()))
-        if self.empty:
-            return offsets
-        return offsets + self.lower_bounds
-
-    def get_coordinates_grid(self):
-        """Return a (d+1)-dimensionial ndarray of cell coordinates.
-
-        The shape of the resulting ndarray is `region.shape + (d,)`. If the
-        region has no mask then this result, reshaped to (-1, d), is the same as
-        `get_coordinates_list()`.
-        """
+    @property
+    def position_grid(self):
+        """Implements Region.position_grid."""
         # For each axis, get the range along that axis.
-        if self.empty:
-            axis_ranges = (np.arange(0),) * self.dimensions
-        else:
-            axis_ranges = map(np.arange, self.lower_bounds, self.upper_bounds + 1)
+        axis_ranges = map(np.arange, self.lower_bounds, self.upper_bounds + 1)
         # Take a Cartesian product of those ranges to get the offsets.
         return utils.arrays.nd_cartesian_grid(*axis_ranges)
+
+    def slices(self, other):
+        """Return a slice tuple that selects the intersection of `self` and
+        `other`'s bounding boxes relative to `self.lower_bound`.
+
+        Raises ValueError if `self` and `other` do not intersect.
+        """
+        if other.is_empty:
+            return False
+        if not self.box.intersects(other.box):
+            raise ValueError(f"Regions {self} and {other} do not intersect; cannot compute intersecting slices")
+        shared_lower, shared_upper = np.clip(self.bounds, *other.bounds) - self.lower_bounds
+        return tuple(map(slice, shared_lower, shared_upper + 1))
+
+
+class MaskedRegion(RectRegion):
+    """An immutable non-empty masked hyperrectangle of positions on a grid.
+
+    Do not instantiate this class directly; use Region.span() instead.
+
+    Public read-only properties:
+    - mask -- bool ndarray with same shape as region
+    ... and all of RectRegion's read-only properties.
+    """
+
+    def __init__(self, *args, bounds, mask):
+        super().__init__(*args, bounds=bounds)
+        error_extra = " Region.__new__() should prevent this exception."
+        not_allowed = f" is not allowed for {self.__class__.__name__}."
+        if mask is None:
+            raise ValueError("Null mask" + not_allowed + error_extra)
+        if mask.all():
+            raise ValueError("Full mask" + not_allowed + error_extra)
+        if not mask.any():
+            raise ValueError("Empty mask" + not_allowed + error_extra)
+        if mask.shape != self.shape:
+            raise ValueError("Mask shape does not match region shape." + error_extra)
+        self._count = np.count_nonzero(mask)
+        self._mask = mask
+
+    has_mask = True  # Overrides RectRegion.has_mask.
+
+    @property
+    def mask(self):
+        """Overrides RectRegion.mask."""
+        return self._mask
+
+
+    @property
+    def count(self):
+        return self._count
+
+    def _mask_contains(self, coords):
+        """Return whether a given position is included in the mask.
+
+        `coords` is assumed to be within the bounding box of the region.
+        """
+        return self.mask[tuple(coords - self.lower_bounds)]
+
+    def _contains_position(self, other):
+        """Overrides RectRegion._contains_position()."""
+        coords = utils.convert.to_coords(other, self.dimensions)
+        if not super()._contains_position(coords):
+            return False
+        return self._mask_contains(coords)
+
+    def __iter__(self):
+        """Overrides RectRegion.__iter__()."""
+        return filter(self._mask_contains, super().__iter__())
+
+    def __repr__(self):
+        """Overrides RectRegion.__repr__()."""
+        s = super().__repr__()[:-1]
+        s += f', {self.mask!r}'
+        s += ')'
+        return s
+
+    def __str__(self):
+        """Overrides RectRegion.__str__()."""
+        s = super().__str__()[:-1]
+        s += f' with {len(self)}-element mask'
+        s += ']'
+        return s
+
+    def __eq__(self, other):
+        """Overrides RectRegion.__eq__()"""
+        return (isinstance(other, MaskedRegion)
+                and (self.bounds == other.bounds).all()
+                and (self.mask == other.mask).all())
+
+    def _offset(self, offset):
+        """Overrides RectRegion._offset()."""
+        return Region.span(self.bounds + offset, self.mask)
+
+    def invert(self, axes=None):
+        """Overrides RectRegion.invert()."""
+        axes = axes or None  # Turn empty tuple into None.
+        new_mask = np.flip(self.mask, axes)
+        return Region.span(super().invert(axes), new_mask)
+
+    @property
+    def box(self):
+        """Overrides RectRegion.box"""
+        return Region.span(self.bounds)
+
+    @property
+    def positions(self):
+        """Overrides RectRegion.positions."""
+        offsets = np.transpose(np.nonzero(self.mask))
+        return offsets + self.lower_bounds

@@ -6,32 +6,32 @@ import numpy as np
 from .custom_strategies import (
     dimensions_strategy,
     cell_coords_strategy,
+    region_mask_strategy,
     region_strategy,
 )
-from automaton.region import Region
+from automaton.region import Region, MaskedRegion
 
 
 @given(
     region=dimensions_strategy().flatmap(region_strategy)
 )
 def test_region(region):
+    note('r = ' + str(region))
     positions = list(region)
     # Test that len(region) is accurate.
     assert len(region) == len(positions)
     # Test that there are no duplicate coordinates.
     assert len(region) == len(set(map(tuple, positions)))
-    # Test region.get_coordinates_list() against iter(region).
-    coordinates_list = region.get_coordinates_list()
-    assert coordinates_list.tolist() == np.array(list(region)).tolist()
-    # Test region.get_coordinates_grid() against iter(region.remask()).
-    coordinates_grid = region.get_coordinates_grid()
-    flatter_grid = coordinates_grid.reshape((-1, region.dimensions))
-    assert flatter_grid.tolist() == np.array(list(region.remask())).tolist()
+    # Test region.positions against iter(region).
+    assert region.positions.tolist() == np.array(list(region)).tolist()
+    # Test region.position_grid against iter(region.box).
+    flatter_grid = region.position_grid.reshape((-1, region.dimensions))
+    assert flatter_grid.tolist() == np.array(list(region.box)).tolist()
     # Test position-in-region containment.
     for position in region:
         assert position in region
     # Test that not everything is within the region.
-    if region.empty:
+    if region.is_empty:
         assert (0,) * region.dimensions not in region
     else:
         # - Test below lower bound on first axis.
@@ -42,9 +42,8 @@ def test_region(region):
         positions[-1][-1] += 1
         assert positions[-1] not in region
         positions[-1][-1] -= 1
-    # Test equality and minifying.
-    assert region == region.minify()
-    assert (region != region.remask()) == region.has_mask
+    # Test equality.
+    assert (region != region.box) == isinstance(region, MaskedRegion)
     # Test stringifying.
     assert str(region)
     assert repr(region)
@@ -52,8 +51,8 @@ def test_region(region):
 
 @given(
     regions=dimensions_strategy(max_dim=4).flatmap(lambda d: st.tuples(
-        region_strategy(d),
-        region_strategy(d),
+        region_strategy(d, max_extent=5),
+        region_strategy(d, max_extent=5),
     ))
 )
 def test_region_operators(regions):
@@ -104,11 +103,11 @@ def test_region_operators(regions):
     # Test other miscellaneous properties.
     assert (r1 == intersection) == (r1 in r2)
     assert (r2 == intersection) == (r2 in r1)
-    assert (r1 == difference) == r2.empty
-    assert (r2 == difference) == r1.empty
+    assert (r1 == difference) == r2.is_empty
+    assert (r2 == difference) == r1.is_empty
     assert (r1 == union) == (r2 in r1)
     assert (r2 == union) == (r1 in r2)
-    assert (r1 == subtraction) == intersection.empty
+    assert (r1 == subtraction) == intersection.is_empty
 
 
 @given(
@@ -121,10 +120,13 @@ def test_region_offset(dimensioned_args):
     region, offset = dimensioned_args
     added = region + offset
     subtracted = region - offset
+    note('r = ' + str(region))
+    note('r+ = ' + str(added))
+    note('r- = ' + str(subtracted))
     # Test invariant properties, such as number of cells and emptiness.
     assert len(added) == len(subtracted) == len(region)
-    assert added.empty == subtracted.empty == region.empty
-    if offset.any() and not region.empty:
+    assert added.is_empty == subtracted.is_empty == region.is_empty
+    if offset.any() and not region.is_empty:
         assert added != subtracted != region
     else:
         assert added == subtracted == region
@@ -136,62 +138,74 @@ def test_region_offset(dimensioned_args):
 @given(
     dimensioned_args=dimensions_strategy().flatmap(lambda d: st.tuples(
         region_strategy(d),
-        (np_st.arrays(np.bool, st.just(d), st.booleans())
-            # Yay functional programming!
-            .map(np.nonzero)
-            .map(lambda a: a[0])
-            .map(tuple)),
+        (st.sets(st.integers(min_value=0, max_value=d - 1))
+            .map(tuple)
+            .map(sorted)),
     ))
 )
 def test_region_invert(dimensioned_args):
     region, axes = dimensioned_args
-    # Test "negation."
-    assert region.invert() == -region
+    note('axes = ' + str(axes))
+    note('original = ' + str(region))
+    inverted = region.invert(axes)
+    note('inverted = ' + str(inverted))
+    # Test length.
+    assert len(region) == len(inverted)
+    # Test negated cell positions.
+    for pos in region:
+        new_pos = pos.copy()
+        for axis in axes or range(region.dimensions):
+            new_pos[axis] *= -1
+        assert new_pos in inverted
     # Test that the inverse of the inverse is the original.
-    assert region.invert().invert() == region
-    assert region.invert(axes).invert(axes) == region
+    assert inverted.invert(axes) == region
     if not axes:
-        assert region.invert(axes) == region.invert()
+        assert region.invert() == inverted
 
 
 @given(
-    unminified_region=dimensions_strategy().flatmap(lambda d:
-        region_strategy(d, allow_empty=False, minify=st.just(False)),
+    region_args=dimensions_strategy().flatmap(lambda d:
+        region_strategy(
+            d,
+            allow_empty=False,
+            allow_nonrectangular=False,
+            minify=st.just(False)
+        ).flatmap(lambda r: st.tuples(
+            st.just(r),
+            region_mask_strategy(r, allow_empty=True),
+        )),
     )
 )
-def test_region_minify(unminified_region):
-    minified_region = unminified_region.minify()
+def test_region_minify(region_args):
+    original, mask = region_args
+    masked = Region.span(original, mask)
     # Make sure that the minified region is within the unminified region.
-    assert minified_region in unminified_region
-    for axis in range(minified_region.dimensions):
-        rolled_minified = np.moveaxis(minified_region.get_mask(), axis, 0)
-        # Make sure that there is something on every edge.
-        assert rolled_minified[0].any()
-        assert rolled_minified[-1].any()
+    assert masked in original
+    if not masked.is_empty:
+        for axis in range(masked.dimensions):
+            rolled_minified = np.moveaxis(masked.mask, axis, 0)
+            # Make sure that there is something on every edge.
+            assert rolled_minified[0].any()
+            assert rolled_minified[-1].any()
     # And make sure that nothing got cut off.
-    slices = minified_region.slices(unminified_region)
-    mask_copy = minified_region.get_mask().copy()
-    # Cut out the part that's in the minified Region ...
-    mask_copy[slices] = False
-    # ... and check that the rest is false.
-    assert not mask_copy.any()
+    assert len(masked) == np.count_nonzero(mask)
 
 
 @given(
-    original=dimensions_strategy().flatmap(region_strategy)
+    original=dimensions_strategy().flatmap(lambda d: region_strategy(d, allow_empty=False))
 )
 def test_empty_region(original):
     # Test minifying to an empty region.
-    new_mask = original.get_mask().copy()
+    new_mask = original.mask.copy()
     new_mask.fill(False)
-    region = original.remask(new_mask)
-    assert region.empty
+    region = Region.span(original, new_mask)
+    assert region.is_empty
     # Test position-in-region containment.
     for pos in original:
         assert pos not in region
     # Test region-in-region containment.
     assert region in original
-    assert (original in region) == original.empty
+    assert (original in region) == original.is_empty
     # Test iteration.
     assert len(list(region)) == 0
     # Test length.
@@ -200,9 +214,9 @@ def test_empty_region(original):
     assert str(region)
     assert repr(region)
     # Test dimension count and construction from dimension count.
-    region2 = region.empty_copy()
-    region3 = Region(region.dimensions)
-    region4 = region3.empty_copy()
+    region2 = Region.empty(region)
+    region3 = Region.empty(region.dimensions)
+    region4 = Region.empty(region2)
     # Test equality.
     assert region == region2 == region3 == region4
-    assert (region == original) == original.empty
+    assert region != original

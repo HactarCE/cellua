@@ -16,20 +16,3 @@ def nd_cartesian(*arrays, repeat=1):
     The order of the returned values is the same as `itertools.product`.
     """
     return nd_cartesian_grid(*arrays, repeat=repeat).reshape(-1, len(arrays))
-
-
-def convert_to_coords(coords, d=None):
-    """Convert `coords` to a 1D integer ndarray of length `d`, or raise a
-    ValueError if it cannot be converted.
-    """
-    try:
-        coords = np.array(coords, dtype=np.int64)
-        if d is not None:
-            assert coords.shape == (d,)
-        return coords
-    except Exception:
-        pass
-    msg = f"Argument {coords} is not convertible to coordinate ndarray"
-    if d is not None:
-        msg += f" of shape ({d},)"
-    raise ValueError(msg)
