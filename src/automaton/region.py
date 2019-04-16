@@ -57,72 +57,69 @@ class Region(ABC):
         - bounds -- one of the following:
             - integer ndarray of shape (2, d); two opposite corners
             - integer ndarray of shape (d,); single cell
-            - Region; same bounds as the given region
+            - Region; bounds will be reused
 
         Optional arguments:
-        - mask (default None) -- boolean ndarray with shape the same as Region
-          or None
+        - mask (default None) -- None or boolean ndarray with shape the same as
+          region
 
         If a single cell is supplied with no mask, a 1^d region will be
         returned. If a single cell is supplied with a non-null mask, the single
         cell will be used as the minimum bound and the region size will be
         inferred from the mask.
         """
-        if isinstance(bounds, Region):
+        if isinstance(bounds, EmptyRegion):
             region = bounds
-            if hasattr(region, 'bounds'):
-                bounds = region.bounds
-            elif mask is None:
-                return region.box
+            if mask is None:
+                return region
             else:
-                return TypeError(f"Cannot add mask to {region} of type {region.__class__.__name__}")
+                raise TypeError(f"Cannot mask {region} of type {region.__class__.__name__}")
+        elif isinstance(bounds, RectRegion):
+            region = bounds
+            bounds = region.bounds
         else:
-            # Copy `bounds` and ensure it's an ndarray.
-            bounds = np.array(bounds)
-            if (bounds.ndim == 2 and bounds.shape[0] == 1) or bounds.ndim == 1:
+            dimensions = None if mask is None else mask.ndim
+            try:
+                lower_bounds = utils.convert.to_coords(bounds, dimensions)
                 if mask is None:
-                    raise ValueError(f"Supplied single coordinate array {coords} for 'coords', but 'mask' is None")
-                elif mask.ndim == bounds.shape[-1]:
-                    lower_bounds = bounds.flatten()
-                    bounds = np.array([lower_bounds, lower_bounds + mask.shape - 1])
+                    upper_bounds = lower_bounds
                 else:
-                    raise ValueError(f"Mask dimensionality {mask.ndim} does not match bounds dimensionality {bounds.shape[-1]}")
-            if bounds.ndim != 2 or bounds.shape[0] != 2:
-                raise ValueError(f"Invalid region array shape: {bounds}")
+                    upper_bounds = lower_bounds + mask.shape - 1
+                bounds = np.stack((lower_bounds, upper_bounds))
+            except ValueError:
+                bounds = utils.convert.to_bounds(bounds)
         dimensions = bounds.shape[1]
-        if mask is not None and not mask.any():
-            return Region.empty(dimensions)
-        bounds.sort(0)  # Ensure that `lower_bounds < upper_bounds`.
         if mask is not None:
-            if isinstance(mask, np.ndarray):
-                region_shape = tuple(bounds[1] - bounds[0] + 1)
-                if mask.shape != region_shape:
-                    raise ValueError(f"Mask shape {mask.shape} does not match region shape {region_shape}")
-                # For each axis, try to make the region as small as possible
-                # while still including all the True values in the mask.
-                for axis in range(dimensions):
-                    lower, upper = 0, -1
-                    # Move the relevant axis to the zeroth position for
-                    # convenience.
-                    mask = np.moveaxis(mask, axis, 0)
-                    # Increase the lower bound
-                    while not mask[lower].any():
-                        lower += 1
-                    # Decrease the upper bound
-                    while not mask[upper].any():
-                        upper -= 1
-                    bounds[:, axis] += lower, upper + 1
-                    mask = mask[lower:] if upper == -1 else mask[lower:upper + 1]
-                    # Move the axis back to where it belongs.
-                    mask = np.moveaxis(mask, 0, axis)
-                # If the mask is all True, don't bother storing it.
-                if not mask.all():
-                    # Copy the mask to guarantee immutability and potentially save
-                    # memory by making the array contiguous.
-                    mask = mask.copy()
-                    return MaskedRegion(bounds=bounds, mask=mask)
-            else:
-                raise TypeError(f"Mask must be an ndarray or None; {mask} found instead")
+            if mask.ndim != dimensions:
+                raise ValueError(f"Cannot mask {dimensions}D bounds with {mask.ndim}D mask")
+            region_shape = tuple(bounds[1] - bounds[0] + 1)
+            if mask.shape != region_shape:
+                raise ValueError(f"Mask shape {mask.shape} does not match region shape {region_shape}")
+            if not mask.any():
+                return Region.empty(dimensions)
+            # For each axis, try to make the region as small as possible
+            # while still including all the True values in the mask.
+            for axis in range(dimensions):
+                lower, upper = 0, -1
+                # Move the relevant axis to the zeroth position for
+                # convenience.
+                mask = np.moveaxis(mask, axis, 0)
+                # Increase the lower bound
+                while not mask[lower].any():
+                    lower += 1
+                # Decrease the upper bound
+                while not mask[upper].any():
+                    upper -= 1
+                bounds[:, axis] += lower, upper + 1
+                mask = mask[lower:] if upper == -1 else mask[lower:upper + 1]
+                # Move the axis back to where it belongs.
+                mask = np.moveaxis(mask, 0, axis)
+            # If the mask is all True, don't bother storing it.
+            if not mask.all():
+                # Copy the mask to guarantee immutability and potentially save
+                # memory by making the array contiguous.
+                mask = mask.copy()
+                return MaskedRegion(bounds=bounds, mask=mask)
         return RectRegion(bounds=bounds)
 
     def empty(arg):
@@ -582,7 +579,6 @@ class MaskedRegion(RectRegion):
     def mask(self):
         """Overrides RectRegion.mask."""
         return self._mask
-
 
     @property
     def count(self):

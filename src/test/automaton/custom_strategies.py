@@ -65,17 +65,17 @@ def grid_strategy(dimen):
     return st.builds(Grid, st.just(dimen))
 
 
-def region_mask_strategy(region, *, allow_empty):
+def region_mask_strategy(region, *, allow_empty=True):
     """Return a strategy for masks for a given Region.
 
     Arguments:
     - region
 
-    Keyword arguments:
-    - allow_empty
+    Optional keyword arguments:
+    - allow_empty (default True)
     """
-    # This `tuple(map(int, ...))` nonsense is stupid and I don't know
-    # why it's necessary. (maybe bug in Hypothesis?)
+    # This `tuple(map(int, ...))` nonsense is stupid and I don't know why it's
+    # necessary. (maybe bug in Hypothesis?)
     region_shape = tuple(map(int, region.shape))
     def assume_nonempty(mask):
         if not allow_empty:
@@ -105,7 +105,8 @@ def region_strategy(dimen,
     - max_cell_count (default 1000)
     - max_extent (default 50)
 
-    Any other keyword arguments are treated as strategies passed to Region.span().
+    Any other keyword arguments are treated as strategies passed to
+    Region.span().
     """
 
     max_extent = min(max_extent, int(max_cell_count ** (1 / dimen) / 2))

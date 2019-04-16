@@ -1,4 +1,4 @@
-from hypothesis import given, note
+from hypothesis import assume, given, note
 import hypothesis.strategies as st
 import hypothesis.extra.numpy as np_st
 import numpy as np
@@ -9,7 +9,7 @@ from .custom_strategies import (
     region_mask_strategy,
     region_strategy,
 )
-from automaton.region import Region, MaskedRegion
+from automaton.region import Region, RectRegion, MaskedRegion
 
 
 @given(
@@ -133,6 +133,30 @@ def test_region_offset(dimensioned_args):
     for pos in region:
         assert pos + offset in added
         assert pos - offset in subtracted
+
+
+@given(
+    dimensioned_args=dimensions_strategy().flatmap(lambda d: st.tuples(
+        cell_coords_strategy(d),
+        region_strategy(d).flatmap(region_mask_strategy),
+    ))
+)
+def test_region_from_cell(dimensioned_args):
+    pos, mask = dimensioned_args
+    note('pos = ' + str(pos))
+    note('mask = ' + str(mask))
+    r1 = Region.span(pos)
+    note('r1 = ' + str(r1))
+    assert len(r1) == 1
+    assert pos in r1
+    r2 = Region.span(pos, mask)
+    note('r2 = ' + str(r2))
+    assert len(r2) == np.count_nonzero(mask)
+    if isinstance(r1, RectRegion):
+        assert (r1.bounds == pos).all()
+    if isinstance(r2, MaskedRegion):
+        assert np.all(r2.lower_bounds >= pos)
+        assert Region.span(r2.lower_bounds, r2.mask) == r2
 
 
 @given(
