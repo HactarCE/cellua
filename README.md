@@ -1,6 +1,6 @@
-# Cellua
+## Cellua has been discontinued in favor of [NDCell](https://github.com/HactarCE/NDCell).
 
-**Cellua has been discontinued in favor of [NDCell](https://github.com/HactarCE/NDCell).**
+# Cellua
 
 [![Discord](https://img.shields.io/badge/chat-on%20Discord-7289da.svg?logo=discord&logoWidth=17&logoColor=white)](https://discord.gg/vdJwHQF)
 
